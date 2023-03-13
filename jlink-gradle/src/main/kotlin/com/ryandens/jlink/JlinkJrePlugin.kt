@@ -6,7 +6,6 @@ import org.gradle.api.Project
 import org.gradle.api.attributes.Usage
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.tasks.Copy
-import org.gradle.configurationcache.extensions.capitalized
 
 class JlinkJrePlugin : Plugin<Project> {
     companion object {
@@ -55,6 +54,12 @@ class JlinkJrePlugin : Plugin<Project> {
                 it.dependsOn(jlinkJreTask)
             }
 
+        val downloadJdks =
+            project.tasks.create("downloadJdks") {
+                it.group = "jlink"
+                it.description = "Download and extract all JDKs"
+            }
+
         extension.variants.all { variant ->
             val variantName = variant.name
 
@@ -66,13 +71,14 @@ class JlinkJrePlugin : Plugin<Project> {
                     defaultDependencies { it.addLater(variant.jdkDependencyCoordinates.map(project.dependencies::create)) }
                 }
 
-            val copyJdks =
-                project.tasks.register("download${variantName.capitalized()}Jdk", Copy::class.java) {
+            val copyJdk =
+                project.tasks.register(variant.downloadTaskName, Copy::class.java) {
                     it.group = "jlink"
                     it.description = "Downloads the JDK for $variantName"
                     it.from(variant.operatingSystem.map { it.archiveExtractor(project, jdk.singleFile) })
                     it.into(project.layout.buildDirectory.dir("jdks/$variantName"))
                 }
+            downloadJdks.dependsOn(copyJdk)
 
             val createJre =
                 project.tasks.register(variant.jlinkTaskName, JlinkJreTask::class.java) {
@@ -80,7 +86,7 @@ class JlinkJrePlugin : Plugin<Project> {
                     it.description = "Creates the JRE for $variantName"
                     it.outputDirectory.set(project.layout.buildDirectory.dir("jres/$variantName"))
                     it.modulePath.fileProvider(
-                        copyJdks.map {
+                        copyJdk.map {
                             it.destinationDir.resolve("${variant.version.get()}/${variant.operatingSystem.get().jmodsPath}")
                         },
                     )
