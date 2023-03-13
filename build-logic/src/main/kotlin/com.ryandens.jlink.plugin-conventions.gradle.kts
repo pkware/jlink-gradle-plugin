@@ -38,8 +38,18 @@ gradlePlugin {
     vcsUrl.set("https://github.com/ryandens/jlink-gradle-plugin")
 }
 
+publishing {
+    repositories {
+        maven {
+            url = uri(if (isReleaseBuild(version)) releaseRepositoryUrl else snapshotRepositoryUrl)
+            name = "pkwareNexus"
+            credentials(PasswordCredentials::class)
+        }
+    }
+}
+
 group = "com.ryandens"
-version = "0.4.0"
+version = "0.4.0-PKWARE"
 
 spotless {
     kotlin {
@@ -85,3 +95,26 @@ tasks.named<Task>("check") {
     // Include functionalTest as part of the check lifecycle
     dependsOn(testing.suites.named("functionalTest"))
 }
+
+/**
+ * Determines if the string represents a release build and not a SNAPSHOT.
+ */
+fun isReleaseBuild(version: Any): Boolean = !version.toString().contains("SNAPSHOT")
+
+/**
+ * Url to publish release artifacts to.
+ */
+private val Project.releaseRepositoryUrl: String
+    get() = properties.getOrDefault(
+        "releaseRepositoryUrl",
+        null,
+    )?.toString() ?: "https://packages.smartcrypt.com/repository/maven-internal/"
+
+/**
+ * Url to publish snapshot artifacts to.
+ */
+private val Project.snapshotRepositoryUrl: String
+    get() = properties.getOrDefault(
+        "snapshotRepositoryUrl",
+        null,
+    )?.toString() ?: "https://packages.smartcrypt.com/repository/maven-internal/"
